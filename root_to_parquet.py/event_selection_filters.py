@@ -1,16 +1,18 @@
+# Code for applying several cuts applied to VFB -> HWW data. Taken from "http://dx.doi.org/10.1103/PhysRevD.108.072003"
+# Created by Rik van Rhee - Nikhef master project
+
 import awkward as ak
 import numpy as np
-import vector
 
+# EventObject contains five items: event_id (np.ndarray); jets, muons, electrons and MET (ak.Array, four momentum objects)
 from read_data import EventObjects
 
-
+# Function used overall to apply a mask to the EventObjects
 def apply_event_mask(events: EventObjects,
                     event_mask: ak.Array) -> EventObjects:
     """
     Apply an event-level mask to every event-aligned collection.
     """
-
     return EventObjects(
         event_id=events.event_id[event_mask],
         jets=events.jets[event_mask],
@@ -19,6 +21,7 @@ def apply_event_mask(events: EventObjects,
         met=events.met[event_mask],
     )
 
+# Filter out low pt jets and jets outside a maximum eta
 def jet_pt_eta_mask(events: EventObjects, min_pt: float, max_abs_eta: float) -> EventObjects:
     """
     Keep jets with pt above min_pt and absolute eta below max_abs_eta.
@@ -35,13 +38,42 @@ def jet_pt_eta_mask(events: EventObjects, min_pt: float, max_abs_eta: float) -> 
             met=events.met,
         )
 
+def order_objects_on_pt(events: EventObjects) -> EventObjects:
+    """
+    Sort jets, muons, and electrons independently by descending pt within every event.
+    """
+    jet_order = ak.argsort(
+        events.jets.pt,
+        axis=1,
+        ascending=False,
+    )
+    muon_order = ak.argsort(
+        events.muons.pt,
+        axis=1,
+        ascending=False,
+    )
+    electron_order = ak.argsort(
+        events.electrons.pt,
+        axis=1,
+        ascending=False,
+    )
 
+    return EventObjects(
+        event_id=events.event_id,
+        jets=events.jets[jet_order],
+        muons=events.muons[muon_order],
+        electrons=events.electrons[electron_order],
+        met=events.met,
+    )
+
+# =======================================================================================================================
+#       Preselection filters
+# =======================================================================================================================
 
 def has_atleast_1_muon(events: EventObjects, prints=False) -> EventObjects:
     """
     Keep events containing at least one muon.
     """
-
     has_muons_mask = ak.num(events.muons) >= 1
 
     selected_events = apply_event_mask(events, has_muons_mask)
@@ -64,43 +96,10 @@ def has_atleast_1_electron(events: EventObjects, prints=False) -> EventObjects:
 
     return selected_events
 
-def order_objects_on_pt(events: EventObjects) -> EventObjects:
-    """
-    Sort jets, muons, and electrons independently by descending pt within every event.
-    """
-
-    jet_order = ak.argsort(
-        events.jets.pt,
-        axis=1,
-        ascending=False,
-    )
-
-    muon_order = ak.argsort(
-        events.muons.pt,
-        axis=1,
-        ascending=False,
-    )
-
-    electron_order = ak.argsort(
-        events.electrons.pt,
-        axis=1,
-        ascending=False,
-    )
-
-    return EventObjects(
-        event_id=events.event_id,
-        jets=events.jets[jet_order],
-        muons=events.muons[muon_order],
-        electrons=events.electrons[electron_order],
-        met=events.met,
-    )
-
-
 def leptons_have_opposite_charge(events: EventObjects, prints=False) -> EventObjects:
     """
     Require the leading muon and leading electron to have opposite charge.
     """
-
     leading_muon = events.muons[:, 0]
     leading_electron = events.electrons[:, 0]
 
@@ -113,7 +112,6 @@ def leptons_have_opposite_charge(events: EventObjects, prints=False) -> EventObj
 
     return selected_events
 
-
 def lepton_pt_mask(events: EventObjects,
                    leading_pt: float, 
                    subleading_pt: float, 
@@ -121,7 +119,6 @@ def lepton_pt_mask(events: EventObjects,
     """
     Require the two highest-pt leptons in each event to pass pt thresholds.
     """
-
     # Combine leptons
     leptons = ak.concatenate([events.electrons, events.muons], axis=1)
 
@@ -132,11 +129,8 @@ def lepton_pt_mask(events: EventObjects,
     leading = leptons_sorted[:, 0]
     subleading = leptons_sorted[:, 1]
 
-    # Create masks based on energy thresholds
     leading_mask = leading.pt >= leading_pt
     subleading_mask = subleading.pt >= subleading_pt
-
-    # Combine masks
     total_mask = leading_mask & subleading_mask
 
     selected_event = apply_event_mask(events, total_mask)
@@ -146,8 +140,6 @@ def lepton_pt_mask(events: EventObjects,
 
     return selected_event
 
-
-
 def lepton_eta_mask(events: EventObjects,
                     electron_eta: float, 
                     muon_eta: float, 
@@ -155,7 +147,6 @@ def lepton_eta_mask(events: EventObjects,
     """
     Require the leading electron and leading muon to pass eta acceptance cuts.
     """
-
     leading_muon = events.muons[:, 0]
     leading_electron = events.electrons[:, 0]
 
@@ -177,7 +168,6 @@ def leptons_deltaR_mask(events: EventObjects,
     Require the highest-pt electron and highest-pt muon to be separated
     by more than deltaR.
     """
-
     leading_muon = events.muons[:, 0]
     leading_electron = events.electrons[:, 0]
 
@@ -257,7 +247,6 @@ def has_at_least_two_jets(events: EventObjects, prints=False) -> EventObjects:
     """
     Keep events containing at least two retained jets.
     """
-
     two_or_more_mask = ak.num(events.jets, axis=-1) >= 2
 
     selected_events = apply_event_mask(events, two_or_more_mask)
@@ -271,7 +260,6 @@ def remove_btag(events: EventObjects, pt_thres: float, eta_thres: float, prints=
     """
     Reject events containing a b-tagged jet within the specified acceptance.
     """
-
     b_tagged = events.jets.btag == 1
     pt_mask = events.jets.pt > pt_thres
     eta_mask = abs(events.jets.eta) < eta_thres
@@ -289,7 +277,6 @@ def central_jet_veto(events: EventObjects, pt_cutoff: float, prints=False):
     """
     Reject events with an additional central jet above pt_cutoff.
     """
-
     leading_jet = events.jets[:, 0]
     subleading_jet = events.jets[:, 1]
 
@@ -323,7 +310,6 @@ def outside_lepton_veto(events: EventObjects, prints=False):
     """
     Require the leading electron and muon to lie between the two leading jets.
     """
-
     leading_jet = events.jets[:, 0]
     subleading_jet = events.jets[:, 1]
 
@@ -364,7 +350,6 @@ def jets_mass_mask(events: EventObjects, mass_cutoff: float, prints=False):
     """
     Require the invariant mass of the two leading jets to exceed mass_cutoff.
     """
-
     mass_mask = (events.jets[:, 0] + events.jets[:, 1]).mass > mass_cutoff
 
     selected_events = apply_event_mask(events, mass_mask)
@@ -378,7 +363,6 @@ def jet_rapidity_mask(events: EventObjects, rapidity_diff_cutoff: float, prints=
     """
     Require the two leading jets to have a minimum rapidity separation.
     """
-
     delta_y = abs(events.jets[:, 0].rapidity - events.jets[:, 1].rapidity)
     delta_y_mask = delta_y >= rapidity_diff_cutoff
 
@@ -393,7 +377,6 @@ def lepton_phi_mask(events: EventObjects, delta_phi_cutoff: float, prints=False)
     """
     Require the leading electron-muon pair to have delta-phi below the cutoff.
     """
-
     delta_phi = abs((events.muons[:, 0].phi - events.electrons[:, 0].phi + np.pi) % (2*np.pi) - np.pi)
 
     delta_phi_mask = delta_phi <= delta_phi_cutoff
@@ -409,7 +392,6 @@ def full_preselection(events: EventObjects, prints=False) -> EventObjects:
     """
     Apply baseline jet, lepton, and b-tag preselection requirements.
     """
-
     if prints:
         print(f"N of samples at start:\t\t\t\t {len(events.jets)}")
 
@@ -429,12 +411,22 @@ def full_preselection(events: EventObjects, prints=False) -> EventObjects:
 
     return events
 
-def full_selection(events: EventObjects, prints=False) -> EventObjects:
+def full_selection_reco(events: EventObjects, prints=False) -> EventObjects:
     """
-    Apply VBF topology and dilepton angular selection requirements.
+    Apply VBF topology and dilepton angular selection requirements for reco data.
     """
+    events = central_jet_veto(events, pt_cutoff = 20, prints=prints)
+    events = outside_lepton_veto(events, prints=prints)
+    events = jets_mass_mask(events, mass_cutoff=450, prints=prints)
+    events = jet_rapidity_mask(events, rapidity_diff_cutoff=2.1, prints=prints)
+    events = lepton_phi_mask(events, delta_phi_cutoff=1.4, prints=prints)
 
-    # events = central_jet_veto(events, pt_cutoff = 20, prints=prints)
+    return events
+
+def full_selection_gen(events: EventObjects, prints=False) -> EventObjects:
+    """
+    Apply VBF topology and dilepton angular selection requirements for gen data (Removed CJV).
+    """
     events = outside_lepton_veto(events, prints=prints)
     events = jets_mass_mask(events, mass_cutoff=450, prints=prints)
     events = jet_rapidity_mask(events, rapidity_diff_cutoff=2.1, prints=prints)

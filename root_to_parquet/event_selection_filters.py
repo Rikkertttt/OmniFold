@@ -328,7 +328,7 @@ def lepton_phi_mask(events: EventObjects, delta_phi_cutoff: float) -> EventObjec
 
     return selected_events
 
-def full_preselection(events: EventObjects, prints=False) -> tuple[EventObjects, dict[str, int]]:
+def full_preselection(events: EventObjects) -> tuple[EventObjects, dict[str, int]]:
     """
     Apply baseline jet, lepton, and b-tag preselection requirements.
     """
@@ -348,14 +348,9 @@ def full_preselection(events: EventObjects, prints=False) -> tuple[EventObjects,
     events = has_at_least_two_jets(events);                              counts["2_jets"]       = count_events(events)
     events = remove_btag(events, pt_thres=20, eta_thres=2.5);            counts["btag"]         = count_events(events)
 
-    if prints:
-        for label, n in counts.items():
-            print(f"N after {label}:\t{n}")
-
-
     return events, counts
 
-def full_selection_reco(events: EventObjects, counts: Optional[dict[str, int]] = None, prints=False) -> tuple[EventObjects, dict[str, int]]:
+def full_selection_reco(events: EventObjects, counts: Optional[dict[str, int]] = None) -> tuple[EventObjects, dict[str, int]]:
     """
     Apply VBF topology and dilepton angular selection requirements for reco data.
     """
@@ -368,13 +363,9 @@ def full_selection_reco(events: EventObjects, counts: Optional[dict[str, int]] =
     events = jet_rapidity_mask(events, rapidity_diff_cutoff=2.1);        counts["jet_rapidity"] = count_events(events)
     events = lepton_phi_mask(events, delta_phi_cutoff=1.4);              counts["lepton_phi"]   = count_events(events)
 
-    if prints:
-        for label, n in counts.items():
-            print(f"N after {label}:\t{n}")
-
     return events, counts
 
-def full_selection_gen(events: EventObjects, counts: Optional[dict[str, int]] = None, prints=False) -> tuple[EventObjects, dict[str, int]]:
+def full_selection_gen(events: EventObjects, counts: Optional[dict[str, int]] = None) -> tuple[EventObjects, dict[str, int]]:
     """
     Apply VBF topology and dilepton angular selection requirements for gen data.
     CJV is omitted as this thows away too many events for gen data.

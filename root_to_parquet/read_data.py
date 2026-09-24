@@ -2,6 +2,7 @@ import awkward as ak
 import numpy as np
 import uproot
 import vector
+from typing import Optional
 
 vector.register_awkward()
 
@@ -10,8 +11,16 @@ ELECTRON_MASS_GEV = 0.000511
 
 
 class EventObjects:
-    def __init__(self, event_id, jets, muons, electrons, met, file_id=None):
-        self.event_id = event_id
+    def __init__(
+        self,
+        event_id:  np.ndarray,
+        jets:      ak.Array,
+        muons:     ak.Array,
+        electrons: ak.Array,
+        met:       ak.Array,
+        file_id:   Optional[np.ndarray] = None,
+    ):
+        self.event_id  = event_id
         self.jets      = jets
         self.muons     = muons
         self.electrons = electrons

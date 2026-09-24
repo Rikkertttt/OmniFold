@@ -257,16 +257,18 @@ def load_gen_objects(tree, verbose: bool = False) -> EventObjects:
 
 def save_events(events: EventObjects, path: str) -> None:
     """Save an EventObjects to a parquet file."""
-    ak.to_parquet(
-        ak.Array({
-            "event_id":  events.event_id,
-            "jets":      events.jets,
-            "muons":     events.muons,
-            "electrons": events.electrons,
-            "met":       events.met,
-        }),
-        path,
-    )
+    data = {
+        "event_id":  events.event_id,
+        "jets":      events.jets,
+        "muons":     events.muons,
+        "electrons": events.electrons,
+        "met":       events.met,
+    }
+    if events.file_id is not None:
+        data["file_id"] = events.file_id
+
+    ak.to_parquet(ak.Array(data), path)
+
 
 def load_events(path: str) -> EventObjects:
     """Load an EventObjects from a parquet file."""
@@ -275,10 +277,13 @@ def load_events(path: str) -> EventObjects:
     def to_momentum4d(arr: ak.Array) -> ak.Array:
         return ak.with_parameter(arr, "__record__", "Momentum4D")
 
+    file_id = np.asarray(array["file_id"]) if "file_id" in array.fields else None
+
     return EventObjects(
         event_id  = np.asarray(array["event_id"]),
         jets      = to_momentum4d(array["jets"]),
         muons     = to_momentum4d(array["muons"]),
         electrons = to_momentum4d(array["electrons"]),
         met       = to_momentum4d(array["met"]),
+        file_id   = file_id,
     )

@@ -236,8 +236,8 @@ def load_gen_objects(tree, verbose: bool = False) -> EventObjects:
 def save_events(events: EventObjects, path: str) -> None:
     """Save an EventObjects to a parquet file."""
     ak.to_parquet(
-        ak.zip({
-            "event_id": ak.from_regular(events.event_id[:, np.newaxis])[:, 0],
+        ak.Array({
+            "event_id":  events.event_id,
             "jets":      events.jets,
             "muons":     events.muons,
             "electrons": events.electrons,

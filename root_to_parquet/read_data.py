@@ -1,5 +1,3 @@
-from typing import NamedTuple
-
 import awkward as ak
 import numpy as np
 import uproot
@@ -11,13 +9,38 @@ MUON_MASS_GEV = 0.105658
 ELECTRON_MASS_GEV = 0.000511
 
 
-class EventObjects(NamedTuple):
-    """Collections aligned event-by-event through event_id."""
-    event_id: np.ndarray
-    jets: ak.Array
-    muons: ak.Array
-    electrons: ak.Array
-    met: ak.Array
+class EventObjects:
+    def __init__(self, event_id, jets, muons, electrons, met, file_id=None):
+        self.event_id = event_id
+        self.jets      = jets
+        self.muons     = muons
+        self.electrons = electrons
+        self.met       = met
+        self.file_id   = file_id  # None until combined
+
+    def __add__(self, other: "EventObjects") -> "EventObjects":
+        # Determine file_id for self
+        if self.file_id is None:
+            self_file_id = np.zeros(len(self.event_id), dtype=int)
+            next_id = 1
+        else:
+            self_file_id = self.file_id
+            next_id = int(self.file_id.max()) + 1
+
+        # other always gets the next available file_id
+        other_file_id = np.full(len(other.event_id), next_id, dtype=int)
+
+        return EventObjects(
+            event_id  = np.concatenate([self.event_id,  other.event_id]),
+            jets      = ak.concatenate([self.jets,       other.jets]),
+            muons     = ak.concatenate([self.muons,      other.muons]),
+            electrons = ak.concatenate([self.electrons,  other.electrons]),
+            met       = ak.concatenate([self.met,        other.met]),
+            file_id   = np.concatenate([self_file_id,    other_file_id]),
+        )
+
+    def __len__(self) -> int:
+        return len(self.event_id)
 
 
 def open_root_file(path: str, show_keys: bool = False, verbose: bool = False):

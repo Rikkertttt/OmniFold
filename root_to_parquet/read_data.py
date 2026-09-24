@@ -13,7 +13,6 @@ ELECTRON_MASS_GEV = 0.000511
 
 class EventObjects(NamedTuple):
     """Collections aligned event-by-event through event_id."""
-
     event_id: np.ndarray
     jets: ak.Array
     muons: ak.Array
@@ -249,10 +248,14 @@ def save_events(events: EventObjects, path: str) -> None:
 def load_events(path: str) -> EventObjects:
     """Load an EventObjects from a parquet file."""
     array = ak.from_parquet(path)
+
+    def to_momentum4d(arr: ak.Array) -> ak.Array:
+        return ak.with_parameter(arr, "__record__", "Momentum4D")
+
     return EventObjects(
-        event_id=np.asarray(array["event_id"]),
-        jets=array["jets"],
-        muons=array["muons"],
-        electrons=array["electrons"],
-        met=array["met"],
+        event_id  = np.asarray(array["event_id"]),
+        jets      = to_momentum4d(array["jets"]),
+        muons     = to_momentum4d(array["muons"]),
+        electrons = to_momentum4d(array["electrons"]),
+        met       = to_momentum4d(array["met"]),
     )
